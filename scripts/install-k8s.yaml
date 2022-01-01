@@ -40,16 +40,21 @@
       yum:
         name: docker*
         state: absent
+    - name: Install docker-ce-stable repo
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
 
     - name: Install needed packages
       yum:
         name: "{{item}}"
-        state: present
+        state: latest
       loop:
         - kubeadm
         - kubelet
         - kubectl
         - containerd
+
     - name: Turn off swamp
       command: swapoff -a
       tags: removeswap
@@ -66,7 +71,9 @@
         name: kubelet
         state: started
         enabled: yes
-    
+    - name: Configure contained
+      shell: "containerd config default > /etc/containerd/config.toml"
+
     - name: Start and enable containerd
       service:
         name: containerd
