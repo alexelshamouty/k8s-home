@@ -1,0 +1,83 @@
+---
+- name: Install and prepare the k8s node
+  hosts: all
+  become: true
+  user: cloud
+
+  tasks:
+    - name: Update the node
+      yum:
+        name: "*"
+        state: latest
+      register: result
+  
+    - name: Copy kubernetes repo
+      copy:
+        src: files/kubernetes.repo
+        dest: /etc/yum.repos.d/kubernetes.repo
+    
+    - name: Copy modprobe configuration
+      copy:
+        src: files/k8s-kernel-modules.conf
+        dest: /etc/modprobe.d/k8s-kernel-modules.conf
+
+    - name: Copy selinux config
+      copy:
+        src: files/selinux-config
+        dest: /etc/selinux/config
+    
+    - name:  Copy sysctl configuration
+      copy:
+        src: files/99-kubernetes.conf
+        dest: /etc/sysctl.d/99-kubernetes.conf
+
+    - name: Reboot the system and wait for it to come back
+      reboot:
+        reboot_timeout: 300
+      when: result is changed
+
+    - name: Remove all docker stuff
+      yum:
+        name: docker*
+        state: absent
+
+    - name: Install needed packages
+      yum:
+        name: "{{item}}"
+        state: present
+      loop:
+        - kubeadm
+        - kubelet
+        - kubectl
+        - containerd
+    - name: Turn off swamp
+      command: swapoff -a
+      tags: removeswap
+
+    - name: Remove swap
+      replace:
+        path: /etc/fstab
+        regexp: '^\/swap\.*'
+        replace: "#Swap removed from k8s cluster"
+      tags: removeswap
+
+    - name: Start and enable the kubelet
+      service:
+        name: kubelet
+        state: started
+        enabled: yes
+    
+    - name: Start and enable containerd
+      service:
+        name: containerd
+        state: started
+        enabled: yes
+
+    - name: Copy and template the ClusterConfigurationFile
+      template:
+        src: templates/ClusterConfiguration.yaml.j2
+        dest: /root/ClusterConfiguration.yaml
+
+    - name: Init the cluster
+      command: kubeadm init --config=/root/ClusterConfiguration.yaml
+      tags: init

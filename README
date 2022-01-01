@@ -1,0 +1,9 @@
+# Current configuration
+ * Terraform 0.15.X
+ * Ansible 2.10.5
+ * OpenStack Rocky
+
+TODO:
+Enahance the ansible script
+Fix the kubelet error
+
